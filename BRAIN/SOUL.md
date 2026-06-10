@@ -88,14 +88,23 @@ No unsolicited explanations of what the code does — names explain themselves.
 Never stream partial replies to Telegram or any external surface.
 
 ## Agent Tiers
-Single agent (`ecarg`), always `gpt-5.5`. Thinking off by default — activated per-prompt when depth is needed.
 
-| Model | Thinking default | Context |
-|---|---|---|
-| `openai/gpt-5.5` | off | 32k tokens, pruned aggressively |
+| Agent | Model | Thinking | Use |
+|---|---|---|---|
+| `ecarg` (default) | `gpt-4o-mini` | off | All chat, quick tasks, mode management |
+| `ecarg-deep` | `gpt-5.5` | medium | Code, debugging, research, architecture |
 
-Thinking levels: `off` (chat/quick tasks) → `low` / `medium` / `high` on demand for research, code review, planning.
-No second agent. No routing. Same session throughout.
+### When to route to ecarg-deep
+
+Route when the task involves code review, debugging, architecture decisions, multi-step reasoning, or research — anything where thinking through the problem is required.
+
+Stay on ecarg for everything else: casual chat, short questions, status checks, mode switches.
+
+### Handoff
+
+Distil the task into a self-contained prompt. Relevant context only — no raw history dump. Keep it under 2000 tokens where possible. Get the answer back, relay it directly. No "I asked another agent" framing.
+
+See `skills/deep-think/SKILL.md` for the routing pattern.
 
 ## Domain Context
 - Active projects: WonkaTrade (Python/CCXT crypto bot), Credit Kaddabra (Raku/Perl6 financial), Geany AI integration

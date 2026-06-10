@@ -107,33 +107,30 @@ function deepMerge(target, source) {
 const patch = {
   agents: {
     defaults: {
-      model: {
-        primary: "openai/gpt-5.5",
-        fallbacks: ["openai/gpt-5.4"]
-      },
       workspace: brainDir,
       thinkingDefault: "off",
-      bootstrapMaxChars: 4000,
-      contextTokens: 32000,
+      bootstrapMaxChars: 2000,
+      contextTokens: 16000,
       contextPruning: {
         mode: "cache-ttl",
-        keepLastAssistants: 6,
-        softTrimRatio: 0.5,
-        hardClearRatio: 0.85
+        keepLastAssistants: 4,
+        softTrimRatio: 0.4,
+        hardClearRatio: 0.75
       },
       compaction: {
         mode: "safeguard",
-        maxHistoryShare: 0.35,
+        maxHistoryShare: 0.30,
         memoryFlush: {
           enabled: true,
-          softThresholdTokens: 20000
+          softThresholdTokens: 10000
         }
       },
       subagents: {
-        model: "openai/gpt-5.5",
+        model: "openai/gpt-4o-mini",
         maxConcurrent: 1
       },
-      timeoutSeconds: 60,
+      heartbeat: null,
+      timeoutSeconds: 45,
       typingMode: "thinking"
     },
     // agents.list is fully owned by us — always replace
@@ -142,11 +139,16 @@ const patch = {
         id: "ecarg",
         default: true,
         model: {
+          primary: "openai/gpt-4o-mini",
+          fallbacks: ["openai/gpt-5.4-mini"]
+        }
+      },
+      {
+        id: "ecarg-deep",
+        model: {
           primary: "openai/gpt-5.5",
           fallbacks: ["openai/gpt-5.4"]
-        },
-        bootstrapMaxChars: 4000,
-        contextTokens: 32000
+        }
       }
     ]
   },
@@ -198,7 +200,8 @@ merged.agents.list = patch.agents.list;
 fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", { mode: 0o600 });
 
 console.log("Config patched:");
-console.log("  ecarg (default) → openai/gpt-5.5  [single agent, thinking off by default, 1M ctx]");
+console.log("  ecarg (default)  → openai/gpt-4o-mini  [chat, fast, cheap]");
+console.log("  ecarg-deep       → openai/gpt-5.5      [thinking:medium, deep tasks only]");
 console.log(`  workspace       → ${brainDir}`);
 EOF
 

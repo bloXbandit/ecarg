@@ -1,14 +1,10 @@
 {
   "agents": {
     "defaults": {
-      "model": {
-        "primary": "openai/gpt-5.5",
-        "fallbacks": ["openai/gpt-5.4"]
-      },
       "workspace": "/home/bpwonka/apps/moltbot/BRAIN",
       "thinkingDefault": "off",
-      "bootstrapMaxChars": 4000,
-      "contextTokens": 32000,
+      "bootstrapMaxChars": 2000,
+      "contextTokens": 16000,
 
       "contextPruning": {
         "mode": "cache-ttl",
@@ -46,15 +42,11 @@
           "onSearch": false,
           "watch": true,
           "watchDebounceMs": 3000,
-          "intervalMinutes": 0,
-          "sessions": {
-            "deltaBytes": 200000,
-            "deltaMessages": 80
-          }
+          "intervalMinutes": 0
         },
         "query": {
-          "maxResults": 5,
-          "minScore": 0.50,
+          "maxResults": 4,
+          "minScore": 0.55,
           "hybrid": {
             "enabled": true,
             "vectorWeight": 0.70,
@@ -73,7 +65,7 @@
       },
 
       "subagents": {
-        "model": "openai/gpt-5.5",
+        "model": "openai/gpt-4o-mini",
         "maxConcurrent": 1
       },
 
@@ -86,25 +78,26 @@
         "onSessionEnd": "bash /home/bpwonka/apps/moltbot/scripts/session-extractor.sh"
       }
     },
+
     "list": [
       {
         "id": "ecarg",
         "default": true,
         "model": {
+          "primary": "openai/gpt-4o-mini",
+          "fallbacks": ["openai/gpt-5.4-mini"]
+        }
+      },
+      {
+        "id": "ecarg-deep",
+        "model": {
           "primary": "openai/gpt-5.5",
           "fallbacks": ["openai/gpt-5.4"]
-        },
-        "bootstrapMaxChars": 4000,
-        "contextTokens": 32000,
-        "memorySearch": {
-          "query": {
-            "maxResults": 4,
-            "minScore": 0.55
-          }
         }
       }
     ]
   },
+
   "gateway": {
     "port": 18789,
     "mode": "local",
@@ -126,16 +119,16 @@
         "api": "openai-completions",
         "models": [
           {
-            "id": "gpt-5.4-mini",
-            "name": "GPT-5.4 Mini",
-            "contextWindow": 400000,
+            "id": "gpt-4o-mini",
+            "name": "GPT-4o Mini",
+            "contextWindow": 128000,
             "reasoning": false,
             "input": ["text", "image"]
           },
           {
-            "id": "gpt-4o-mini",
-            "name": "GPT-4o Mini (fallback)",
-            "contextWindow": 128000,
+            "id": "gpt-5.4-mini",
+            "name": "GPT-5.4 Mini (fallback)",
+            "contextWindow": 400000,
             "reasoning": false,
             "input": ["text", "image"]
           },
