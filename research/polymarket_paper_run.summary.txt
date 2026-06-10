@@ -1,0 +1,4 @@
+Total rows: 2008
+Counts per asset: btc=670, eth=666, sol=672
+|cb_move_early| > 0.4%: 0 (0.00%)
+pm_up values for big moves (sample): 

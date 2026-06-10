@@ -1,0 +1,18 @@
+{
+  "consecutive_error": 0,
+  "consecutive_no_market": 0,
+  "error_reported": false,
+  "error_streak": 0,
+  "last_error_signature": null,
+  "last_notified_linecount": 819,
+  "last_run_ts": 1773518711,
+  "last_seen_line_count": 926,
+  "last_seen_utc": "2026-03-14T20:05:11Z",
+  "last_status": "ok",
+  "last_ts": 1773518711,
+  "reported_error": false,
+  "reported_no_market": false,
+  "summary_basis": "last_15_rows",
+  "summary_sent": true,
+  "summary_sent_at": "2026-03-13T16:14:55Z"
+}

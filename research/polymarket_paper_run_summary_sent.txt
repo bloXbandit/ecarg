@@ -1,0 +1,3 @@
+Sent summary at 2026-03-06 23:45 ET based on 238 rows. Threshold abs(cb_move_early) > 0.004.
+Sent summary at 2026-03-07 16:56 EST based on 303 rows. Threshold abs(cb_move_early) > 0.004.
+Sent summary at 2026-03-14 16:22 ET based on rows 845-927 (83 new). Threshold abs(cb_move_early) > 0.004.

@@ -1,0 +1,1 @@
+export TAVILY_API_KEY=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
