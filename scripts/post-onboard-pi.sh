@@ -65,8 +65,10 @@ echo "[1/4] Backup saved → $BACKUP_PATH"
 
 mkdir -p \
   "$BRAIN_DIR/agents" \
+  "$BRAIN_DIR/memory" \
   "$BRAIN_DIR/projects" \
   "$BRAIN_DIR/sessions"
+chmod +x "$REPO_DIR/scripts/session-extractor.sh"
 echo "[2/4] BRAIN directories created"
 
 # ── merge multi-model config ──────────────────────────────────────────────────

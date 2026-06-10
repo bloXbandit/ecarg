@@ -53,13 +53,18 @@
           }
         },
         "query": {
-          "maxResults": 3,
-          "minScore": 0.55,
+          "maxResults": 5,
+          "minScore": 0.50,
           "hybrid": {
             "enabled": true,
-            "vectorWeight": 0.75,
-            "textWeight": 0.25
-          }
+            "vectorWeight": 0.70,
+            "textWeight": 0.30
+          },
+          "boosts": [
+            { "field": "content", "contains": "WEIGHT:high", "factor": 1.4 },
+            { "field": "content", "contains": "WEIGHT:medium", "factor": 1.0 },
+            { "field": "content", "contains": "WEIGHT:low", "factor": 0.65 }
+          ]
         },
         "cache": {
           "enabled": true,
@@ -75,7 +80,11 @@
       "heartbeat": null,
       "timeoutSeconds": 45,
       "typingMode": "thinking",
-      "maxConcurrent": 1
+      "maxConcurrent": 1,
+
+      "hooks": {
+        "onSessionEnd": "bash /home/bpwonka/apps/moltbot/scripts/session-extractor.sh"
+      }
     },
     "list": [
       {

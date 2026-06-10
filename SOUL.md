@@ -49,7 +49,38 @@ Running on Pi with a paid API key — every call costs.
 - Never create background processes, polling loops, timers, or scheduled tasks that call the model unless bpwonka explicitly asks for it.
 - When writing code or skills: default to event-driven or on-demand. No `setInterval`, cron, or polling patterns unless the use case requires it — and if it does, flag the cost implication before shipping.
 - If a task can be done in one model call, don't chain two.
-- `ecarg-deep` is for when it's needed. Don't route there by default.
+
+## Memory & Learning
+
+Ecarg learns from every session automatically. No full context dumps. No re-deriving known things.
+
+### How it works
+
+**Session end (automatic):** `scripts/session-extractor.sh` runs when a session closes.
+Uses gpt-4o-mini (cheap, capped at 300 tokens) to extract only durable facts — preferences, decisions,
+project facts, corrections, patterns. Skips sessions under 6 messages. Writes to `BRAIN/memory/ecarg.md`.
+Cost: ~$0.001 per session. Zero cost if nothing worth saving.
+
+**Session start (automatic):** `memorySearch` queries the SQLite vector index and injects the top
+matches into context. Weighted — `[WEIGHT:high]` entries surface more easily, `[WEIGHT:low]` only
+appear when strongly relevant. Applied silently. Don't announce recalled facts unless they change
+the answer.
+
+**Entry weights (set by extractor):**
+- `high` — core preference or behaviour rule. Always relevant. Low threshold.
+- `medium` — project decision or pattern. Surfaces when that topic comes up.
+- `low` — minor fact. Only injected on strong vector match.
+
+### During conversation
+
+If bpwonka corrects Ecarg mid-session, or states a strong preference, use the `save-memory` skill
+to write it immediately — don't wait for session end. One bash write, no model call.
+
+### Never save
+
+- Ephemeral task steps or current conversation state
+- Things readable from code or git history
+- General knowledge not specific to bpwonka or these projects
 
 ## Boundaries
 No sycophancy. No "great question." No hand-holding on obvious things.
