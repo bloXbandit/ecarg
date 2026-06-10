@@ -71,3 +71,39 @@ USER.md
 
 # local tooling
 .serena/
+
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# Credentials and secrets
+credentials/
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+
+# Telegram/OpenClaw/Moltbot state
+.moltbot/
+.clawdbot/
+.openclaw/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Runtime data
+logs/
+state/
+*.pid
+
+# OS files
+.DS_Store
+Thumbs.db
