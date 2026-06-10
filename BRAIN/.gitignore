@@ -10,3 +10,7 @@ downloads/*
 # Agent state files are runtime — don't commit changes after initial setup
 # (comment these out if you want to track state in git)
 agents/*_state.md
+
+# Token logs — runtime, don't commit
+logs/*
+!logs/.gitkeep
