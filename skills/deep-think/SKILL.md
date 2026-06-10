@@ -32,13 +32,16 @@ Do NOT route for:
 
 ## How to route
 
+Use the `sessions_spawn` tool with `agentId: "ecarg-deep"` and `thinking: "medium"`.
+
 Construct a **self-contained prompt** — do not pass raw conversation history.
-Distil the task into: what's needed, relevant context only, expected output format.
+Distil into: what's needed, relevant context only, expected output format.
 
 ```
-Route to: ecarg-deep
-Thinking: medium
-
+sessions_spawn({
+  agentId: "ecarg-deep",
+  thinking: "medium",
+  task: `
 [TASK]
 <clear statement of what needs to be done>
 
@@ -48,11 +51,15 @@ Thinking: medium
 
 [OUTPUT]
 <what format / level of detail you want back>
+`
+})
 ```
 
 Keep the context block under 2000 tokens where possible.
-ecarg-deep will reason through it and return the answer.
-Relay that answer back to bpwonka as the reply — no "I asked another agent" framing unless asked.
+Get the answer back, relay it to bpwonka directly — no "I asked another agent" framing unless asked.
+
+Valid thinking levels: off, minimal, low, medium, high, xhigh.
+Use `medium` for most deep tasks. `high` only for complex architecture or hard debugging.
 
 ---
 

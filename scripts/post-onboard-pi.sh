@@ -141,6 +141,9 @@ const patch = {
         model: {
           primary: "openai/gpt-4o-mini",
           fallbacks: ["openai/gpt-5.4-mini"]
+        },
+        subagents: {
+          allowAgents: ["ecarg-deep"]
         }
       },
       {
