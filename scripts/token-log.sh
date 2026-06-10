@@ -1,166 +1,133 @@
 #!/usr/bin/env bash
-# token-log.sh
-#
-# Parses moltbot session JSONL files and produces a line-item token usage report.
-# Reads OpenAI usage fields (prompt_tokens, completion_tokens, total_tokens) logged
-# per assistant turn, tallies by session, and appends a daily summary to
-# BRAIN/logs/token_usage.log
-#
-# Usage:
-#   bash scripts/token-log.sh              # report today's sessions
-#   bash scripts/token-log.sh --all        # report all sessions
-#   bash scripts/token-log.sh --summary    # just print running totals from log
-#
-# Costs (update if model pricing changes):
-#   gpt-5.5:      $3.00 / 1M input,  $15.00 / 1M output
-#   gpt-5.4:      $2.00 / 1M input,  $10.00 / 1M output
-#   gpt-5.4-mini: $0.15 / 1M input,   $0.60 / 1M output
-#   gpt-4o-mini:  $0.15 / 1M input,   $0.60 / 1M output
-#
-# Hook into daily cron or call manually from Telegram: "token usage"
-
+# Parse Moltbot JSONL session logs and report token/cost usage.
 set -euo pipefail
 
 BRAIN_DIR="${BRAIN_DIR:-/home/bpwonka/apps/moltbot/BRAIN}"
-SESSION_DIR="${HOME}/.clawdbot/agents/ecarg/sessions"
-LOG_FILE="${BRAIN_DIR}/logs/token_usage.log"
+SESSION_DIR="${SESSION_DIR:-$HOME/.clawdbot/agents/ecarg/sessions}"
+LOG_FILE="${TOKEN_USAGE_LOG:-$BRAIN_DIR/logs/token_usage.log}"
 MODE="${1:---today}"
-
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# ── model cost table (per 1M tokens) ─────────────────────────────────────────
-
-declare -A INPUT_COST=(
-  ["gpt-5.5"]="3.00"
-  ["gpt-5.4"]="2.00"
-  ["gpt-5.4-mini"]="0.15"
-  ["gpt-4o-mini"]="0.15"
-)
-declare -A OUTPUT_COST=(
-  ["gpt-5.5"]="15.00"
-  ["gpt-5.4"]="10.00"
-  ["gpt-5.4-mini"]="0.60"
-  ["gpt-4o-mini"]="0.60"
-)
-
-# ── summary mode — just print the log ────────────────────────────────────────
+case "$MODE" in
+  --today|--all|--summary) ;;
+  *) echo "Usage: $0 [--today|--all|--summary]" >&2; exit 2 ;;
+esac
 
 if [ "$MODE" = "--summary" ]; then
-  if [ ! -f "$LOG_FILE" ]; then
-    echo "No token log yet at $LOG_FILE"
-    exit 0
-  fi
-  cat "$LOG_FILE"
+  [ -f "$LOG_FILE" ] && cat "$LOG_FILE" || echo "No token log yet at $LOG_FILE"
   exit 0
 fi
 
-# ── select sessions to parse ─────────────────────────────────────────────────
+[ -d "$SESSION_DIR" ] || { echo "No session dir found at $SESSION_DIR" >&2; exit 1; }
 
-if [ ! -d "$SESSION_DIR" ]; then
-  echo "No session dir found at $SESSION_DIR"
-  exit 1
-fi
-
-if [ "$MODE" = "--all" ]; then
-  FILES=$(ls "$SESSION_DIR"/*.jsonl 2>/dev/null || true)
-else
-  # today only
-  TODAY=$(date +%Y-%m-%d)
-  FILES=$(find "$SESSION_DIR" -name "*.jsonl" -newer /tmp/.token-log-sentinel 2>/dev/null || \
-          find "$SESSION_DIR" -name "*.jsonl" | xargs ls -t | head -20 || true)
-  touch /tmp/.token-log-sentinel
-fi
-
-if [ -z "$FILES" ]; then
-  echo "No sessions found."
-  exit 0
-fi
-
-# ── parse and report ──────────────────────────────────────────────────────────
-
-python3 - "$LOG_FILE" $FILES <<'PY'
-import sys, json, os
+python3 - "$SESSION_DIR" "$LOG_FILE" "$MODE" <<'PY'
+import json, sys
+from pathlib import Path
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
-log_file = sys.argv[1]
-session_files = sys.argv[2:]
+session_dir = Path(sys.argv[1])
+log_file = Path(sys.argv[2])
+mode = sys.argv[3]
+today = datetime.now().astimezone().date()
 
-# cost table
-input_cost  = {"gpt-5.5":3.00,"gpt-5.4":2.00,"gpt-5.4-mini":0.15,"gpt-4o-mini":0.15}
-output_cost = {"gpt-5.5":15.00,"gpt-5.4":10.00,"gpt-5.4-mini":0.60,"gpt-4o-mini":0.60}
+# Fallback estimates, USD per 1M tokens. Provider logged cost wins when nonzero.
+PRICE = {
+    "gpt-5.5": {"input": 3.00, "output": 15.00, "cacheRead": 0.30, "cacheWrite": 3.00},
+    "gpt-5.4": {"input": 2.00, "output": 10.00, "cacheRead": 0.20, "cacheWrite": 2.00},
+    "gpt-5.4-mini": {"input": 0.15, "output": 0.60, "cacheRead": 0.015, "cacheWrite": 0.15},
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60, "cacheRead": 0.075, "cacheWrite": 0.15},
+}
 
-def model_cost(model, inp, out):
-    ic = input_cost.get(model, 0)
-    oc = output_cost.get(model, 0)
-    return (inp / 1_000_000 * ic) + (out / 1_000_000 * oc)
-
-totals = defaultdict(lambda: {"input":0,"output":0,"calls":0,"cost":0.0})
-lines = []
-grand_input = grand_output = grand_calls = 0
-grand_cost = 0.0
-
-for path in sorted(session_files):
-    sid = os.path.basename(path).replace(".jsonl","")
-    sess_input = sess_output = sess_calls = 0
-    sess_cost = 0.0
-    model = "gpt-5.5"  # default
-
+def parse_ts(value):
+    if not isinstance(value, str):
+        return None
     try:
-        with open(path) as f:
-            for line in f:
-                try:
-                    obj = json.loads(line)
-                except:
-                    continue
-                # pick up model name if logged
-                if obj.get("model"):
-                    model = obj["model"].split("/")[-1]
-                usage = obj.get("usage") or obj.get("token_usage") or {}
-                inp = usage.get("prompt_tokens") or usage.get("input_tokens") or 0
-                out = usage.get("completion_tokens") or usage.get("output_tokens") or 0
-                if inp or out:
-                    cost = model_cost(model, inp, out)
-                    sess_input  += inp
-                    sess_output += out
-                    sess_calls  += 1
-                    sess_cost   += cost
-                    totals[model]["input"]  += inp
-                    totals[model]["output"] += out
-                    totals[model]["calls"]  += 1
-                    totals[model]["cost"]   += cost
-    except Exception as e:
-        lines.append(f"  WARN: could not parse {sid}: {e}")
-        continue
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
 
-    if sess_calls:
-        grand_input  += sess_input
-        grand_output += sess_output
-        grand_calls  += sess_calls
-        grand_cost   += sess_cost
-        lines.append(
-            f"  {sid[:30]:<30}  in:{sess_input:>7}  out:{sess_output:>6}  "
-            f"calls:{sess_calls:>3}  ${sess_cost:.5f}"
-        )
+def model_key(model):
+    if not model:
+        return "unknown"
+    return str(model).split("/")[-1]
 
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-report = [f"\n{'='*70}", f"  TOKEN REPORT — {timestamp}", f"{'='*70}"]
-report += lines
-report.append(f"\n  {'BY MODEL':-<50}")
-for m, d in sorted(totals.items()):
-    report.append(
-        f"  {m:<20}  in:{d['input']:>8}  out:{d['output']:>7}  "
-        f"calls:{d['calls']:>4}  ${d['cost']:.5f}"
-    )
-report.append(f"\n  {'TOTAL':<20}  in:{grand_input:>8}  out:{grand_output:>7}  "
-              f"calls:{grand_calls:>4}  ${grand_cost:.5f}")
-report.append(f"{'='*70}")
+def estimate(model, u):
+    p = PRICE.get(model_key(model), {})
+    return sum((float(u.get(k) or 0) / 1_000_000) * float(p.get(k, 0)) for k in ("input", "output", "cacheRead", "cacheWrite"))
 
-out_str = "\n".join(report)
-print(out_str)
+def usage_cost(u, model):
+    c = u.get("cost") if isinstance(u.get("cost"), dict) else {}
+    total = c.get("total")
+    if isinstance(total, (int, float)) and total > 0:
+        return float(total), "logged"
+    return estimate(model, u), "estimated"
 
-with open(log_file, "a") as f:
-    f.write(out_str + "\n")
+files = sorted(session_dir.glob("*.jsonl"))
+rows = []
+by_model = defaultdict(lambda: {"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"calls":0,"cost":0.0})
+grand = {"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"calls":0,"cost":0.0}
 
-print(f"\n  Appended to {log_file}")
+for path in files:
+    sess = {"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"calls":0,"cost":0.0}
+    models = defaultdict(int)
+    first_ts = last_ts = None
+    include_file = mode == "--all"
+
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            ts = parse_ts(obj.get("timestamp"))
+            if ts:
+                first_ts = first_ts or ts
+                last_ts = ts
+                if mode == "--today" and ts.astimezone().date() == today:
+                    include_file = True
+            msg = obj.get("message") if isinstance(obj.get("message"), dict) else {}
+            if msg.get("role") != "assistant":
+                continue
+            u = msg.get("usage") if isinstance(msg.get("usage"), dict) else None
+            if not u:
+                continue
+            if mode == "--today" and ts and ts.astimezone().date() != today:
+                continue
+            model = model_key(msg.get("model") or obj.get("model") or "unknown")
+            vals = {k:int(u.get(k) or 0) for k in ("input","output","cacheRead","cacheWrite","totalTokens")}
+            if not any(vals.values()):
+                continue
+            cost, _source = usage_cost(u, model)
+            for k,v in vals.items():
+                sess[k] += v; by_model[model][k] += v; grand[k] += v
+            sess["calls"] += 1; by_model[model]["calls"] += 1; grand["calls"] += 1
+            sess["cost"] += cost; by_model[model]["cost"] += cost; grand["cost"] += cost
+            models[model] += 1
+
+    if include_file and sess["calls"]:
+        top_model = max(models.items(), key=lambda x: x[1])[0] if models else "unknown"
+        rows.append((path.stem, top_model, first_ts, last_ts, sess))
+
+stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+period = "today" if mode == "--today" else "all sessions"
+out = ["="*86, f"TOKEN USAGE — {stamp} — {period}", "="*86]
+if not rows:
+    out.append("No usage rows found.")
+else:
+    out.append("Sessions:")
+    for sid, model, first_ts, last_ts, s in rows:
+        out.append(f"  {sid[:24]:<24} {model:<16} in:{s['input']:>8} out:{s['output']:>7} cacheR:{s['cacheRead']:>8} cacheW:{s['cacheWrite']:>7} calls:{s['calls']:>4} ${s['cost']:.5f}")
+out.append("\nBy model:")
+for model, d in sorted(by_model.items(), key=lambda kv: kv[1]["cost"], reverse=True):
+    if d["calls"]:
+        out.append(f"  {model:<20} in:{d['input']:>9} out:{d['output']:>8} cacheR:{d['cacheRead']:>9} cacheW:{d['cacheWrite']:>8} calls:{d['calls']:>5} ${d['cost']:.5f}")
+out.append(f"\nTOTAL                in:{grand['input']:>9} out:{grand['output']:>8} cacheR:{grand['cacheRead']:>9} cacheW:{grand['cacheWrite']:>8} calls:{grand['calls']:>5} ${grand['cost']:.5f}")
+out.append("Note: uses logged provider cost when present; otherwise fallback estimates from scripts/token-log.sh.")
+out.append("="*86)
+report = "\n".join(out)
+print(report)
+with log_file.open("a", encoding="utf-8") as f:
+    f.write(report + "\n")
+print(f"\nAppended to {log_file}")
 PY
