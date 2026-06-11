@@ -117,12 +117,14 @@ Memory checkpoints survive — Ecarg still knows what matters.
 **Stay on ecarg for:** casual chat, short questions, status checks, mode switches, anything answerable in 1–2 sentences.
 
 **Before routing to ecarg-deep:**
-1. Run `budget-check` — block if daily cap hit
+1. Run `budget-check` — if exit 1 (daily cap hit), stop and tell bpwonka
 2. Distil task to self-contained prompt, context under 2000 tokens
 3. Call `sessions_spawn` with `agentId: "ecarg-deep"`, `thinking: "medium"`
-4. Relay result directly — no "I asked another agent" framing
+4. Verify result is not empty or an error before relaying
+5. Prepend `(deep)` to the response — bpwonka sees which model answered
+6. No "I asked another agent" framing — just `(deep)` tag + answer
 
-See `skills/deep-think/SKILL.md` for the call pattern.
+See `skills/deep-think/SKILL.md` for the full call pattern.
 
 ---
 
