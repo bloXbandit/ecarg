@@ -3,23 +3,23 @@
     "defaults": {
       "workspace": "/home/bpwonka/apps/moltbot/BRAIN",
       "thinkingDefault": "off",
-      "bootstrapMaxChars": 2000,
-      "contextTokens": 16000,
+      "bootstrapMaxChars": 1500,
+      "contextTokens": 8000,
 
       "contextPruning": {
         "mode": "cache-ttl",
-        "keepLastAssistants": 4,
-        "softTrimRatio": 0.4,
-        "hardClearRatio": 0.75,
-        "minPrunableToolChars": 500
+        "keepLastAssistants": 2,
+        "softTrimRatio": 0.25,
+        "hardClearRatio": 0.60,
+        "minPrunableToolChars": 300
       },
 
       "compaction": {
         "mode": "safeguard",
-        "maxHistoryShare": 0.30,
+        "maxHistoryShare": 0.20,
         "memoryFlush": {
           "enabled": true,
-          "softThresholdTokens": 10000
+          "softThresholdTokens": 6000
         }
       },
 
@@ -45,8 +45,8 @@
           "intervalMinutes": 0
         },
         "query": {
-          "maxResults": 4,
-          "minScore": 0.55,
+          "maxResults": 3,
+          "minScore": 0.62,
           "hybrid": {
             "enabled": true,
             "vectorWeight": 0.70,

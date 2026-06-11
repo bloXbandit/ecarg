@@ -67,8 +67,14 @@ mkdir -p \
   "$BRAIN_DIR/agents" \
   "$BRAIN_DIR/memory" \
   "$BRAIN_DIR/projects" \
-  "$BRAIN_DIR/sessions"
+  "$BRAIN_DIR/sessions" \
+  "$BRAIN_DIR/logs" \
+  "$BRAIN_DIR/trash/sessions"
 chmod +x "$REPO_DIR/scripts/session-extractor.sh"
+chmod +x "$REPO_DIR/scripts/budget-check.sh"
+chmod +x "$REPO_DIR/scripts/tmux-status.sh"
+chmod +x "$REPO_DIR/scripts/dump-session.sh"
+chmod +x "$REPO_DIR/scripts/token-log.sh"
 echo "[2/4] BRAIN directories created"
 
 # ── merge multi-model config ──────────────────────────────────────────────────
@@ -223,6 +229,32 @@ echo "  export BRAIN_DIR=/home/bpwonka/apps/moltbot/BRAIN"
 echo "  export MOLTBOT_CONFIG_PATH=$CONFIG_PATH"
 echo ""
 echo "Then reload: source ~/.profile"
+echo ""
+
+# ── tmux status bar setup ─────────────────────────────────────────────────────
+
+TMUX_CONF="$HOME/.tmux.conf"
+TMUX_LINE="set -g status-right '#(\${REPO_DIR}/scripts/tmux-status.sh)'"
+TMUX_INTERVAL="set -g status-interval 30"
+
+if [ -f "$TMUX_CONF" ]; then
+  if ! grep -q "tmux-status.sh" "$TMUX_CONF"; then
+    echo "" >> "$TMUX_CONF"
+    echo "# Ecarg token usage status" >> "$TMUX_CONF"
+    echo "set -g status-right '#($REPO_DIR/scripts/tmux-status.sh)'" >> "$TMUX_CONF"
+    echo "set -g status-interval 30" >> "$TMUX_CONF"
+    echo "tmux status bar configured → $TMUX_CONF"
+  else
+    echo "tmux status bar already configured — skipped"
+  fi
+else
+  cat > "$TMUX_CONF" <<TMUXEOF
+# Ecarg token usage status
+set -g status-right '#($REPO_DIR/scripts/tmux-status.sh)'
+set -g status-interval 30
+TMUXEOF
+  echo "tmux config created → $TMUX_CONF"
+fi
 echo ""
 
 # ── restart gateway ───────────────────────────────────────────────────────────
