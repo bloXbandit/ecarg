@@ -383,24 +383,44 @@ export async function runSubagentAnnounceFlow(params: {
             ? `failed: ${outcome.error || "unknown error"}`
             : "finished with unknown status";
 
-    // Build instructional message for main agent
+    // Build direct delivery message — bypass main agent LLM to prevent
+    // summarization, re-ingestion loops, and self-response cycles.
     const taskLabel = params.label || params.task || "background task";
-    const triggerMessage = [
-      `A background task "${taskLabel}" just ${statusLabel}.`,
-      "",
-      "Findings:",
-      reply || "(no output)",
-      "",
-      statsLine,
-      "",
-      "Summarize this naturally for the user. Keep it brief (1-2 sentences). Flow it into the conversation naturally.",
-      "Do not mention technical details like tokens, stats, or that this was a background task.",
-      "You can respond with NO_REPLY if no announcement is needed (e.g., internal task with no user-facing result).",
-    ].join("\n");
+
+    // For ecarg-deep responses: deliver verbatim with [ecarg-deep] prefix.
+    // For other subagents: deliver result directly with status.
+    const isDeepAgent =
+      typeof params.childSessionKey === "string" &&
+      params.childSessionKey.toLowerCase().includes("ecarg-deep");
+
+    let directMessage: string;
+    if (isDeepAgent) {
+      if (outcome.status === "ok" && reply) {
+        // Verbatim relay — no LLM rewrite.
+        // Always show [ecarg-deep] prefix. Strip a leading (deep) marker from
+        // the reply body since [ecarg-deep] already identifies the source.
+        if (reply.startsWith("[ecarg-deep]")) {
+          // Already correctly tagged — pass through as-is
+          directMessage = reply;
+        } else {
+          // Strip any leading (deep) marker ecarg-deep may have self-tagged,
+          // then wrap with the canonical [ecarg-deep] prefix.
+          const body = reply.replace(/^\(deep\)\s*/i, "");
+          directMessage = `[ecarg-deep]\n${body}`;
+        }
+      } else {
+        directMessage = `[ecarg-deep] ${statusLabel}. No usable output returned.`;
+      }
+    } else {
+      // Non-deep subagent: simple status + result, no LLM summarization
+      directMessage = outcome.status === "ok" && reply
+        ? reply
+        : `Task "${taskLabel}" ${statusLabel}.`;
+    }
 
     const queued = await maybeQueueSubagentAnnounce({
       requesterSessionKey: params.requesterSessionKey,
-      triggerMessage,
+      triggerMessage: directMessage,
       summaryLine: taskLabel,
       requesterOrigin,
     });
@@ -413,30 +433,45 @@ export async function runSubagentAnnounceFlow(params: {
       return true;
     }
 
-    // Send to main agent - it will respond in its own voice
+    // Deliver directly to channel — do NOT re-feed through agent LLM
     let directOrigin = requesterOrigin;
     if (!directOrigin) {
       const { entry } = loadRequesterSessionEntry(params.requesterSessionKey);
       directOrigin = deliveryContextFromSession(entry);
     }
-    await callGateway({
-      method: "agent",
-      params: {
-        sessionKey: params.requesterSessionKey,
-        message: triggerMessage,
-        deliver: true,
-        channel: directOrigin?.channel,
-        accountId: directOrigin?.accountId,
-        to: directOrigin?.to,
-        threadId:
-          directOrigin?.threadId != null && directOrigin.threadId !== ""
-            ? String(directOrigin.threadId)
-            : undefined,
-        idempotencyKey: crypto.randomUUID(),
-      },
-      expectFinal: true,
-      timeoutMs: 60_000,
-    });
+
+    const recipientTo = directOrigin?.to;
+    const isWebchat =
+      !directOrigin?.channel ||
+      directOrigin.channel === "webchat" ||
+      !recipientTo;
+
+    if (!isWebchat && recipientTo) {
+      // External channel (Telegram, Signal, etc.) — direct send bypasses LLM entirely
+      await callGateway({
+        method: "send",
+        params: {
+          to: recipientTo,
+          message: directMessage,
+          channel: directOrigin?.channel,
+          accountId: directOrigin?.accountId,
+          sessionKey: params.requesterSessionKey,
+          idempotencyKey: crypto.randomUUID(),
+        },
+        timeoutMs: 60_000,
+      });
+    } else {
+      // Terminal / webchat session — inject directly into transcript, no LLM involved
+      await callGateway({
+        method: "chat.inject",
+        params: {
+          sessionKey: params.requesterSessionKey,
+          message: directMessage,
+          label: isDeepAgent ? "ecarg-deep" : undefined,
+        },
+        timeoutMs: 15_000,
+      });
+    }
 
     didAnnounce = true;
   } catch (err) {

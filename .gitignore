@@ -108,3 +108,14 @@ state/
 .DS_Store
 Thumbs.db
 .serena/
+
+# Backup files created by agent edits
+*.bak.*
+*.bak
+
+# Session transcripts and trash
+BRAIN/trash/
+BRAIN/sessions/
+
+# Research run outputs
+research/*.jsonl
