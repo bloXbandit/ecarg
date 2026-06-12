@@ -98,23 +98,34 @@ function resolveAnnounceOrigin(
 
 async function sendAnnounce(item: AnnounceQueueItem) {
   const origin = item.origin;
-  const threadId =
-    origin?.threadId != null && origin.threadId !== "" ? String(origin.threadId) : undefined;
-  await callGateway({
-    method: "agent",
-    params: {
-      sessionKey: item.sessionKey,
-      message: item.prompt,
-      channel: origin?.channel,
-      accountId: origin?.accountId,
-      to: origin?.to,
-      threadId,
-      deliver: true,
-      idempotencyKey: crypto.randomUUID(),
-    },
-    expectFinal: true,
-    timeoutMs: 60_000,
-  });
+  const recipientTo = origin?.to;
+  const isWebchat = !origin?.channel || origin.channel === "webchat" || !recipientTo;
+
+  if (!isWebchat && recipientTo) {
+    // External channel — bypass LLM entirely
+    await callGateway({
+      method: "send",
+      params: {
+        to: recipientTo,
+        message: item.prompt,
+        channel: origin?.channel,
+        accountId: origin?.accountId,
+        sessionKey: item.sessionKey,
+        idempotencyKey: crypto.randomUUID(),
+      },
+      timeoutMs: 60_000,
+    });
+  } else {
+    // Terminal / webchat — inject directly into transcript
+    await callGateway({
+      method: "chat.inject",
+      params: {
+        sessionKey: item.sessionKey,
+        message: item.prompt,
+      },
+      timeoutMs: 15_000,
+    });
+  }
 }
 
 function resolveRequesterStoreKey(
@@ -438,22 +449,28 @@ export async function runSubagentAnnounceFlow(params: {
     if (!directOrigin) {
       const { entry } = loadRequesterSessionEntry(params.requesterSessionKey);
       directOrigin = deliveryContextFromSession(entry);
+      // If deliveryContextFromSession didn't find a to field, try lastTo directly
+      if (directOrigin && !directOrigin.to && entry?.lastTo) {
+        directOrigin = { ...directOrigin, to: entry.lastTo };
+      }
     }
 
     const recipientTo = directOrigin?.to;
+    const channel = directOrigin?.channel;
     const isWebchat =
-      !directOrigin?.channel ||
-      directOrigin.channel === "webchat" ||
+      !channel ||
+      channel === "webchat" ||
       !recipientTo;
 
     if (!isWebchat && recipientTo) {
-      // External channel (Telegram, Signal, etc.) — direct send bypasses LLM entirely
+      // External channel (Telegram, Signal, etc.) — method:send bypasses LLM entirely.
+      // Requires a valid `to` target (chat ID / user ID from the channel).
       await callGateway({
         method: "send",
         params: {
           to: recipientTo,
           message: directMessage,
-          channel: directOrigin?.channel,
+          channel,
           accountId: directOrigin?.accountId,
           sessionKey: params.requesterSessionKey,
           idempotencyKey: crypto.randomUUID(),
@@ -461,7 +478,8 @@ export async function runSubagentAnnounceFlow(params: {
         timeoutMs: 60_000,
       });
     } else {
-      // Terminal / webchat session — inject directly into transcript, no LLM involved
+      // Terminal / webchat — method:chat.inject writes directly to session transcript.
+      // Does NOT require a channel target. Does NOT run the LLM.
       await callGateway({
         method: "chat.inject",
         params: {
