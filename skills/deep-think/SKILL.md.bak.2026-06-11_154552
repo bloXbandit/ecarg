@@ -1,0 +1,48 @@
+# Deep Think
+
+Use this skill when the user explicitly asks for deep reasoning, careful analysis, debugging, architecture, financial comparison, legal/contract interpretation, scheduling logic, or anything high-impact.
+
+Before using the deep agent:
+- Keep the prompt short and self-contained.
+- Do not dump raw chat history.
+- Include only the necessary facts, constraints, and exact question.
+- If budget tools are available, check budget first.
+
+To delegate, call the tool named `sessions_spawn`.
+
+Required tool arguments:
+- `task`: the complete task for the subagent
+- `agentId`: `ecarg-deep`
+
+Recommended tool arguments:
+- `label`: `deep-review`
+- `thinking`: `medium`
+- `cleanup`: `keep`
+- `runTimeoutSeconds`: `180`
+
+The task sent to ecarg-deep must instruct it:
+
+1. Start the final answer with exactly `(deep)`.
+2. Keep the user-facing answer concise enough to fit in chat.
+3. Also write the full unabridged answer to:
+   `/home/bpwonka/apps/moltbot/BRAIN/sessions/latest_deep_result.md`
+4. End the chat response with:
+   `Full result saved to BRAIN/sessions/latest_deep_result.md`
+
+Example tool call shape:
+
+sessions_spawn({
+  "agentId": "ecarg-deep",
+  "label": "deep-review",
+  "task": "Start your final answer with exactly `(deep)`. Analyze this carefully. Keep the chat answer concise, but write the full unabridged answer to /home/bpwonka/apps/moltbot/BRAIN/sessions/latest_deep_result.md. Facts: ... Question: ...",
+  "thinking": "medium",
+  "cleanup": "keep",
+  "runTimeoutSeconds": 180
+})
+
+After the tool returns:
+- If status is success, relay the deep result.
+- If the visible answer appears truncated, tell the user to run:
+  `cat /home/bpwonka/apps/moltbot/BRAIN/sessions/latest_deep_result.md`
+- If status is forbidden, error, timeout, or empty, say the exact failure.
+- Do not fake a deep result if the subagent did not run.

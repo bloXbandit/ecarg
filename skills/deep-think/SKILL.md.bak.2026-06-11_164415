@@ -1,0 +1,67 @@
+# Deep Think Skill
+
+Use this skill when the user asks for deeper reasoning, complex analysis, tradeoffs, strategy, debugging, financial/mortgage analysis, project controls analysis, or explicitly says use ecarg-deep.
+
+## Routing Rule
+
+Default agent `ecarg` is the dispatcher. Deep work goes to `ecarg-deep` through `sessions_spawn`.
+
+Before spawning, ecarg must create a compact task packet:
+
+- User request
+- Relevant current-session context
+- Relevant durable memory only if clearly useful
+- Desired output format
+- Any constraints
+- Ask ecarg-deep to label the answer with `(deep)`
+
+Do not dump the full chat history.
+
+## Subagent Call
+
+Use `sessions_spawn` targeting:
+
+agentId: `ecarg-deep`
+
+The prompt to ecarg-deep should say:
+
+"Answer the user directly. Do not write a meta-summary for ecarg. Produce the final user-facing response. Start with `(deep)`."
+
+## Relay Rule
+
+After ecarg-deep returns:
+
+1. If the deep response is short, under about 1,200 characters:
+   - ecarg may lightly restate it.
+   - Preserve the substance.
+   - Keep `(deep)`.
+
+2. If the deep response is long, detailed, technical, or over about 1,200 characters:
+   - ecarg must relay the deep response verbatim.
+   - Do not summarize.
+   - Do not compress.
+   - Do not rewrite.
+   - Do not add extra commentary except one short lead-in if needed.
+
+Correct long-response relay:
+
+(deep)
+<verbatim ecarg-deep response>
+
+Incorrect:
+
+"Here is a summary..."
+"Ecarg-deep said..."
+"To summarize the deep response..."
+
+## Failure Rule
+
+If `sessions_spawn` fails, say plainly:
+
+"ecarg-deep did not run. I’m answering with ecarg instead."
+
+Then answer normally. Do not pretend deep ran.
+
+## Cost Rule
+
+Only use ecarg-deep when the user explicitly requests it or the task clearly benefits from deeper reasoning.

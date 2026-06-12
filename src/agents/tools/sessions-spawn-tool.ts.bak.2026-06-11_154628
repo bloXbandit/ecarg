@@ -82,10 +82,7 @@ export function createSessionsSpawnTool(opts?: {
       const label = typeof params.label === "string" ? params.label.trim() : "";
       const requestedAgentId = readStringParam(params, "agentId");
       const modelOverride = readStringParam(params, "model");
-      const thinkingOverrideRaw =
-        readStringParam(params, "thinking") ??
-        readStringParam(params, "reasoningEffort") ??
-        readStringParam(params, "reasoning.effort");
+      const thinkingOverrideRaw = readStringParam(params, "thinking");
       const cleanup =
         params.cleanup === "keep" || params.cleanup === "delete"
           ? (params.cleanup as "keep" | "delete")
@@ -184,11 +181,7 @@ export function createSessionsSpawnTool(opts?: {
         try {
           await callGateway({
             method: "sessions.patch",
-            params: {
-              key: childSessionKey,
-              model: resolvedModel,
-              ...(thinkingOverride ? { reasoning: { effort: thinkingOverride } } : {}),
-            },
+            params: { key: childSessionKey, model: resolvedModel },
             timeoutMs: 10_000,
           });
           modelApplied = true;

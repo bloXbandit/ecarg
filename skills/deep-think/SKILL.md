@@ -1,112 +1,82 @@
----
-name: deep-think
-description: Route a task to ecarg-deep (gpt-5.5, thinking:medium) when it requires deep reasoning, code review, architecture decisions, debugging, or research. Handles budget check, handoff, result verification, and response tagging.
-metadata: {"moltbot":{"emoji":"🧠"}}
----
+# Deep Think Skill
 
-# deep-think — Routing to ecarg-deep
+Use this skill when the user asks for deeper reasoning, complex analysis, tradeoffs, strategy, debugging, financial/mortgage analysis, project controls analysis, trading/research logic, or explicitly asks to use ecarg-deep.
 
-ecarg runs on gpt-4o-mini. When a task needs real depth, route to ecarg-deep (gpt-5.5, thinking:medium).
-The answer comes back tagged `(deep)` so bpwonka knows which model answered.
+## Core Architecture
 
----
+ecarg is the fast dispatcher.
+ecarg-deep is the reasoning specialist.
 
-## Step 1 — Budget check (always first)
+ecarg should not solve deep tasks itself when the user explicitly asks for ecarg-deep or when the problem clearly needs deeper reasoning.
 
-```bash
-bash /home/bpwonka/apps/moltbot/scripts/budget-check.sh --json
-```
+## Context Forwarding Rule
 
-- Exit 0 → proceed
-- Exit 1 → reply: "Daily budget reached ($2.00). No deep calls today." — STOP
-- Exit 2 → trim the context prompt, try again — do not proceed with fat input
+Before calling ecarg-deep, ecarg must forward only the context needed to answer well.
 
----
+Include:
+- The user's current request
+- Important constraints from the current conversation
+- Relevant facts already known from memory or session context
+- Any numbers, dates, assumptions, file names, model names, or config details needed
+- Desired output style or length
+- Whether the user wants direct commands, analysis, or a decision
 
-## Step 2 — Build a self-contained prompt
+Do not forward:
+- Full raw chat history
+- Irrelevant prior messages
+- Tool noise
+- Logs unless the logs are needed
+- Long memory dumps
 
-Do NOT pass raw conversation history. Distil:
+The forwarded task packet should be compact, usually under 1,500 characters unless the task truly requires more.
 
-```
-[TASK]
-<one clear statement of what needs to be done>
+## Subagent Call
 
-[CONTEXT]
-<only what's directly relevant — file snippets, error messages, prior decisions>
-<strip everything unrelated to this specific task>
+Use `sessions_spawn` targeting:
 
-[OUTPUT]
-<format and detail level expected>
-```
+agentId: `ecarg-deep`
 
-Keep context block under 2000 tokens. If it's over, cut more.
+The prompt to ecarg-deep must say:
 
----
+"Answer the user directly. Start with `(deep)`. Return a final user-facing answer, not notes for ecarg."
 
-## Step 3 — Spawn ecarg-deep
+## Relay Rule
 
-```
-sessions_spawn({
-  agentId: "ecarg-deep",
-  thinking: "medium",
-  task: "<your distilled prompt above>"
-})
-```
+After ecarg-deep returns:
 
-Use `thinking: "high"` only for complex architecture or hard multi-step debugging.
-Use `thinking: "low"` for lighter reasoning tasks to save cost.
+If the deep response is under 1,200 characters:
+- ecarg may restate it naturally.
+- Preserve all important substance.
+- Keep the `(deep)` marker.
+- Do not water it down.
 
----
+If the deep response is 1,200 characters or longer:
+- ecarg must not summarize it.
+- ecarg must say only:
 
-## Step 4 — Verify the result
+Delegating to ecarg-deep...
 
-Before relaying the answer, check:
-- `result.status` is not "error"
-- Result is not empty or a refusal
-- Answer actually addresses the task
+Then post the deep response directly/verbatim.
 
-If the spawn failed or returned empty:
-```
-Reply: "ecarg-deep didn't return a usable answer. [state what failed]"
-```
-Do not fabricate an answer. Do not guess what ecarg-deep would have said.
+Do not compress, paraphrase, rewrite, or shorten long deep responses.
 
----
+## Failure Rule
 
-## Step 5 — Relay with tag
+If `sessions_spawn` fails, say plainly:
 
-Prepend `(deep)` to the response so bpwonka knows it came from ecarg-deep:
+"ecarg-deep did not run. I’m answering with ecarg instead."
 
-```
-(deep) <ecarg-deep's answer>
-```
+Then answer normally.
 
-No other framing. No "I asked another agent." Just the tag and the answer.
+Do not pretend deep ran.
 
----
+## Cost Rule
 
-## When to route
+Use ecarg-deep only when:
+- the user explicitly asks for it,
+- the task needs deeper reasoning,
+- the task involves high-stakes config/debugging,
+- the task involves mortgage/trading/project-controls analysis with meaningful nuance,
+- or ecarg is unsure and needs a stronger reasoning pass.
 
-Route when the task involves:
-- Code review, debugging, refactoring non-trivial code
-- Architecture decisions or design choices
-- Multi-step reasoning or research
-- Analysing files, logs, or data sets
-- Any question where thinking through the problem is required
-
-## When NOT to route
-
-- Casual chat, short questions, status checks
-- Mode switches
-- Anything answerable in 1–2 sentences without reasoning
-- When daily budget is hit
-
----
-
-## Cost awareness
-
-ecarg-deep (gpt-5.5) costs ~20–100x more per call than ecarg.
-Tight 1000-token prompt + 500-token answer ≈ $0.01.
-Sloppy 8000-token dump ≈ $0.15+.
-
-Distil before routing. Always.
+For simple questions, ecarg should answer directly.

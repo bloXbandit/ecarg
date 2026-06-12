@@ -1,0 +1,48 @@
+# Deep Think
+
+Use this skill when the user explicitly asks for deep reasoning, careful analysis, debugging, architecture, financial comparison, legal/contract interpretation, scheduling logic, or anything high-impact.
+
+Before using the deep agent:
+- Keep the prompt short and self-contained.
+- Do not dump raw chat history.
+- Include only the necessary facts, constraints, and exact question.
+- If budget tools are available, check budget first.
+
+To delegate, call the tool named `sessions_spawn`.
+
+Required tool arguments:
+- `task`: the complete task for the subagent
+- `agentId`: `ecarg-deep`
+
+Recommended tool arguments:
+- `label`: `deep-review`
+- `thinking`: `medium`
+- `cleanup`: `keep`
+- `runTimeoutSeconds`: `180`
+
+The task sent to ecarg-deep must say:
+- Use reasoning.effort = medium if supported by the model/provider.
+- Start the final answer with exactly `(deep)`.
+- Return the complete answer, not a shortened summary.
+- Also write the full answer to `/home/bpwonka/apps/moltbot/BRAIN/sessions/latest_deep_result.md`.
+
+Example tool call shape:
+
+sessions_spawn({
+  "agentId": "ecarg-deep",
+  "label": "deep-review",
+  "task": "Use reasoning.effort = medium if supported. Start the final answer with exactly `(deep)`. Return the complete answer, not a summary. Also write the full answer to /home/bpwonka/apps/moltbot/BRAIN/sessions/latest_deep_result.md. Facts: ... Question: ...",
+  "thinking": "medium",
+  "cleanup": "keep",
+  "runTimeoutSeconds": 180
+})
+
+After the tool returns:
+- If status is success:
+  - Return the subagent output verbatim.
+  - Prefix only the FIRST line with `(deep)` if the subagent did not already do it.
+  - Do NOT summarize, condense, shorten, or rewrite the subagent response.
+- If the visible answer appears truncated, tell the user to run:
+  `cat /home/bpwonka/apps/moltbot/BRAIN/sessions/latest_deep_result.md`
+- If status is forbidden, error, timeout, or empty, say the exact failure.
+- Do not fake a deep result if the subagent did not run.
