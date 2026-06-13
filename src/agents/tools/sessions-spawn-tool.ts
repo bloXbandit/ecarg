@@ -163,8 +163,14 @@ export function createSessionsSpawnTool(opts?: {
       const childSessionKey = `agent:${targetAgentId}:subagent:${crypto.randomUUID()}`;
       const spawnedByKey = requesterInternalKey;
       const targetAgentConfig = resolveAgentConfig(cfg, targetAgentId);
+      const targetPrimaryModel =
+        typeof targetAgentConfig?.model === "string"
+          ? targetAgentConfig.model
+          : targetAgentConfig?.model?.primary;
+
       const resolvedModel =
         normalizeModelSelection(modelOverride) ??
+        normalizeModelSelection(targetPrimaryModel) ??
         normalizeModelSelection(targetAgentConfig?.subagents?.model) ??
         normalizeModelSelection(cfg.agents?.defaults?.subagents?.model);
       let thinkingOverride: string | undefined;

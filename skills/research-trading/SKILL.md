@@ -6,6 +6,9 @@ metadata: {"moltbot":{"emoji":"📈","requires":{"bins":["curl","python3"]}}}
 
 # research-trading — Research & Trading Session
 
+## Model
+**GPT Model:** gpt-5.5
+
 Focused mode for WonkaTrade, crypto analysis, market lookups, and trading bot dev.
 
 ## Enter mode
