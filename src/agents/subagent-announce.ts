@@ -424,24 +424,25 @@ export async function runSubagentAnnounceFlow(params: {
       }
     } else {
       // Non-deep subagent: simple status + result, no LLM summarization
-      directMessage = outcome.status === "ok" && reply
-        ? reply
-        : `Task "${taskLabel}" ${statusLabel}.`;
+      directMessage =
+        outcome.status === "ok" && reply ? reply : `Task "${taskLabel}" ${statusLabel}.`;
     }
 
-    const queued = await maybeQueueSubagentAnnounce({
-      requesterSessionKey: params.requesterSessionKey,
-      triggerMessage: directMessage,
-      summaryLine: taskLabel,
-      requesterOrigin,
-    });
-    if (queued === "steered") {
-      didAnnounce = true;
-      return true;
-    }
-    if (queued === "queued") {
-      didAnnounce = true;
-      return true;
+    if (!isDeepAgent) {
+      const queued = await maybeQueueSubagentAnnounce({
+        requesterSessionKey: params.requesterSessionKey,
+        triggerMessage: directMessage,
+        summaryLine: taskLabel,
+        requesterOrigin,
+      });
+      if (queued === "steered") {
+        didAnnounce = true;
+        return true;
+      }
+      if (queued === "queued") {
+        didAnnounce = true;
+        return true;
+      }
     }
 
     // Deliver directly to channel — do NOT re-feed through agent LLM
@@ -457,10 +458,7 @@ export async function runSubagentAnnounceFlow(params: {
 
     const recipientTo = directOrigin?.to;
     const channel = directOrigin?.channel;
-    const isWebchat =
-      !channel ||
-      channel === "webchat" ||
-      !recipientTo;
+    const isWebchat = !channel || channel === "webchat" || !recipientTo;
 
     if (!isWebchat && recipientTo) {
       // External channel (Telegram, Signal, etc.) — method:send bypasses LLM entirely.
