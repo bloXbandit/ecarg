@@ -224,7 +224,12 @@ function finalizeSubagentCleanup(runId: string, cleanup: "delete" | "keep", didA
   }
   if (!didAnnounce) {
     // Allow retry on the next wake if the announce failed.
-    entry.cleanupHandled = false;
+    // But only reset if cleanupCompletedAt is not already set — prevents
+    // a second completion handler (onAgentEvent vs waitForSubagentCompletion)
+    // from re-firing the announce after the first one already ran.
+    if (!entry.cleanupCompletedAt) {
+      entry.cleanupHandled = false;
+    }
     persistSubagentRuns();
     return;
   }
