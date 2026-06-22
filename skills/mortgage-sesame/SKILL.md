@@ -1,3 +1,5 @@
+**Network Note:** You are running on the Raspberry Pi. Use the bash/exec tool for LAN calls. `192.168.0.35:8000` is reachable from this machine when MortgageSesame is online. Do not refuse private IP access by default.
+
 ---
 name: mortgage-sesame
 description: Interact with the MortgageSesame backend API and manage Mortgage Mode — a focused session context for mortgage platform work. Triggers on "mortgage mode", "mortgage sesame", "ms mode", or any MortgageSesame API request. Auto-exits after 30 minutes of silence.

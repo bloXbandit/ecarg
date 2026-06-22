@@ -218,17 +218,18 @@ export function createSessionsSendTool(opts?: {
           });
         }
       }
-      const timeoutSeconds =
-        typeof params.timeoutSeconds === "number" && Number.isFinite(params.timeoutSeconds)
-          ? Math.max(0, Math.floor(params.timeoutSeconds))
-          : 30;
-      const timeoutMs = timeoutSeconds * 1000;
-      const announceTimeoutMs = timeoutSeconds === 0 ? 30_000 : timeoutMs;
       const idempotencyKey = crypto.randomUUID();
       let runId: string = idempotencyKey;
       const requesterAgentId = resolveAgentIdFromSessionKey(requesterInternalKey);
       const targetAgentId = resolveAgentIdFromSessionKey(resolvedKey);
       const isCrossAgent = requesterAgentId !== targetAgentId;
+      const explicitTimeoutSeconds =
+        typeof params.timeoutSeconds === "number" && Number.isFinite(params.timeoutSeconds)
+          ? Math.max(0, Math.floor(params.timeoutSeconds))
+          : undefined;
+      const timeoutSeconds = explicitTimeoutSeconds ?? (targetAgentId === "ecarg-deep" ? 180 : 30);
+      const timeoutMs = timeoutSeconds * 1000;
+      const announceTimeoutMs = timeoutSeconds === 0 ? 30_000 : timeoutMs;
       if (isCrossAgent) {
         if (!a2aPolicy.enabled) {
           return jsonResult({
