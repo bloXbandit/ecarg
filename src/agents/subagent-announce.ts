@@ -378,9 +378,13 @@ export async function runSubagentAnnounceFlow(params: {
     }
 
     if (!reply) {
-      reply = await readLatestAssistantReply({
-        sessionKey: params.childSessionKey,
-      });
+      // agent.wait may return before the transcript is fully flushed — retry with
+      // short backoff to give the session store time to write the last message.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 400));
+        reply = await readLatestAssistantReply({ sessionKey: params.childSessionKey });
+        if (reply) break;
+      }
     }
 
     if (!outcome) outcome = { status: "unknown" };
