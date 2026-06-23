@@ -81,20 +81,4 @@ Use ecarg-deep only when:
 
 For simple questions, ecarg should answer directly.
 
-## Mandatory Routing Rule
-
-This skill is always active.
-
-Before answering, classify the request.
-
-If the request is non-trivial, call `sessions_spawn` with:
-
-agentId: "ecarg-deep"
-label: "ecarg-deep"
-
-Do not wait for the user to say "use ecarg-deep."
-
-Do not claim ecarg-deep can only be used on demand.
-
-Default to deep delegation for debugging, code, architecture, financial analysis, mortgage, project controls, scheduling, troubleshooting, research, and multi-step tasks.
 
