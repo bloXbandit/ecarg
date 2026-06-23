@@ -14,8 +14,18 @@ export async function readLatestAssistantReply(params: {
     params: { sessionKey: params.sessionKey, limit: params.limit ?? 50 },
   })) as { messages?: unknown[] };
   const filtered = stripToolMessages(Array.isArray(history?.messages) ? history.messages : []);
-  const last = filtered.length > 0 ? filtered[filtered.length - 1] : undefined;
-  return last ? extractAssistantText(last) : undefined;
+
+  for (let i = filtered.length - 1; i >= 0; i -= 1) {
+    const msg = filtered[i] as { role?: unknown };
+    if (msg?.role !== "assistant") continue;
+
+    const text = extractAssistantText(msg);
+    if (typeof text === "string" && text.trim()) {
+      return text;
+    }
+  }
+
+  return undefined;
 }
 
 export async function runAgentStep(params: {

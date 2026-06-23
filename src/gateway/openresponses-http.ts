@@ -524,7 +524,11 @@ export async function handleOpenResponsesHttpRequest(
           : undefined;
 
       // If agent called a client tool, return function_call instead of text
-      if (stopReason === "tool_calls" && pendingToolCalls && pendingToolCalls.length > 0) {
+      if (
+        (stopReason === "tool_calls" || stopReason === "toolUse") &&
+        pendingToolCalls &&
+        pendingToolCalls.length > 0
+      ) {
         const functionCall = pendingToolCalls[0];
         const functionCallItemId = `call_${randomUUID()}`;
         const response = createResponseResource({
@@ -761,7 +765,11 @@ export async function handleOpenResponsesHttpRequest(
             : undefined;
 
         // If agent called a client tool, emit function_call instead of text
-        if (stopReason === "tool_calls" && pendingToolCalls && pendingToolCalls.length > 0) {
+        if (
+          (stopReason === "tool_calls" || stopReason === "toolUse") &&
+          pendingToolCalls &&
+          pendingToolCalls.length > 0
+        ) {
           const functionCall = pendingToolCalls[0];
           const usage = finalUsage ?? createEmptyUsage();
 
